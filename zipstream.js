@@ -109,38 +109,60 @@ ZipStream.prototype.addFile = function(source, file, callback) {
 
   self._pushLocalFileHeader(file);
 
-  var deflate = zlib.createDeflateRaw(self.options);
   var checksum = crc32.createCRC32();
   var uncompressed = 0;
-  var compressed = 0;
 
-  deflate.on('data', function(chunk) {
-    compressed += chunk.length;
-    self.queue.push(chunk);
-  });
+  if (file.store) {
+    var size = 0;
+    source.on('data', function(chunk) {
+      checksum.update(chunk);
+      uncompressed += chunk.length;
+      self.queue.push(chunk);
+    });
 
-  deflate.on('end', function() {
-    file.crc32 = checksum.digest();
-    file.compressed = compressed;
-    file.uncompressed = uncompressed;
+    source.on('end', function() {
+      file.crc32 = checksum.digest();
+      file.compressed = file.uncompressed = uncompressed;
 
-    self.fileptr += compressed;
-    self._pushDataDescriptor(file);
+      self.fileptr += uncompressed;
+      self._pushDataDescriptor(file);
 
-    self.files.push(file);
-    self.busy = false;
-    callback();
-  });
+      self.files.push(file);
+      self.busy = false;
+      callback();
+    });
+  } else {
+    var deflate = zlib.createDeflateRaw(self.options);
+    var compressed = 0;
 
-  source.on('data', function(data) {
-    uncompressed += data.length;
-    checksum.update(data);
-    deflate.write(data); //TODO check for false & wait for drain
-  });
+    deflate.on('data', function(chunk) {
+      compressed += chunk.length;
+      self.queue.push(chunk);
+    });
 
-  source.on('end', function() {
-    deflate.end();
-  });
+    deflate.on('end', function() {
+      file.crc32 = checksum.digest();
+      file.compressed = compressed;
+      file.uncompressed = uncompressed;
+
+      self.fileptr += compressed;
+      self._pushDataDescriptor(file);
+
+      self.files.push(file);
+      self.busy = false;
+      callback();
+    });
+
+    source.on('data', function(chunk) {
+      uncompressed += chunk.length;
+      checksum.update(chunk);
+      deflate.write(chunk); //TODO check for false & wait for drain
+    });
+
+    source.on('end', function() {
+      deflate.end();
+    });
+  }
 
   process.nextTick(function() { self._read(); });
 }
@@ -154,7 +176,7 @@ ZipStream.prototype._pushLocalFileHeader = function(file) {
 
   file.version = 20;
   file.bitflag = 8;
-  file.method = 8;
+  file.method = file.store ? 0 : 8;
   file.moddate = convertDate(new Date());
   file.offset = self.fileptr;
 

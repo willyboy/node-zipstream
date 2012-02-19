@@ -20,7 +20,7 @@ Creates a ZipStream object. Options are passed to Zlib.
 
         ZipStream.addFile(inputStream, options, callback)
 
-Adds a file to the ZIP stream. At his moment, options must contain "name".
+Adds a file to the ZIP stream. At his moment, options must contain "name". If the "store" option is set to true, the file will be added uncompressed.
 
         ZipStream.finalize(callback(bytes written))
 
