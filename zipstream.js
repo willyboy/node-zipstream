@@ -36,7 +36,7 @@ function convertDate(d) {
   if (year < 1980) {
     return (1<<21) | (1<<16);
   }
-  return ((year-1980) << 25) | ((d.getMonth()+1) << 21) | (d.getDate() << 16) | 
+  return ((year-1980) << 25) | ((d.getMonth()+1) << 21) | (d.getDate() << 16) |
     (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
 }
 
@@ -72,9 +72,9 @@ ZipStream.prototype._read = function() {
     self.emit('end');
     self.readable = false;
 
-		if (self.callback) { 
-			self.callback(self.fileptr); 
-		}
+    if (self.callback) {
+      self.callback(self.fileptr);
+    }
   }
 
   process.nextTick(function() { self._read(); }); //TODO improve
@@ -85,12 +85,12 @@ ZipStream.prototype._read = function() {
 ZipStream.prototype.finalize = function(callback) {
   var self = this;
 
-  if (self.files.length === 0) { 
+  if (self.files.length === 0) {
     emit('error', 'no files in zip');
     return;
   }
 
-	self.callback = callback;
+  self.callback = callback;
   self._pushCentralDirectory();
   self.eof = true;
 }
@@ -106,15 +106,15 @@ ZipStream.prototype.addFile = function(source, file, callback) {
 
   self.busy = true;
   self.file = file;
-  
+
   self._pushLocalFileHeader(file);
 
   var deflate = zlib.createDeflateRaw(self.options);
   var checksum = crc32.createCRC32();
   var uncompressed = 0;
   var compressed = 0;
-  
-  deflate.on('data', function(chunk) { 
+
+  deflate.on('data', function(chunk) {
     compressed += chunk.length;
     self.queue.push(chunk);
   });
@@ -138,8 +138,8 @@ ZipStream.prototype.addFile = function(source, file, callback) {
     deflate.write(data); //TODO check for false & wait for drain
   });
 
-  source.on('end', function() { 
-    deflate.end(); 
+  source.on('end', function() {
+    deflate.end();
   });
 
   process.nextTick(function() { self._read(); });
@@ -160,10 +160,10 @@ ZipStream.prototype._pushLocalFileHeader = function(file) {
 
   var buf = new Buffer(30+file.name.length);
 
-  buf.writeUInt32LE(0x04034b50, 0);         // local file header signature 
+  buf.writeUInt32LE(0x04034b50, 0);         // local file header signature
   buf.writeUInt16LE(file.version, 4);       // version needed to extract
-  buf.writeUInt16LE(file.bitflag, 6);       // general purpose bit flag 
-  buf.writeUInt16LE(file.method, 8);        // compression method  
+  buf.writeUInt16LE(file.bitflag, 6);       // general purpose bit flag
+  buf.writeUInt16LE(file.method, 8);        // compression method
   buf.writeUInt32LE(file.moddate, 10);      // last mod file date and time
 
   buf.writeInt32LE(0, 14);                  // crc32
@@ -203,15 +203,15 @@ ZipStream.prototype._pushCentralDirectory = function() {
     var file = self.files[i];
 
     // central directory file header
-    buf.writeUInt32LE(0x02014b50, ptr+0);         // central file header signature 
-    buf.writeUInt16LE(file.version, ptr+4);       // TODO version made by 
-    buf.writeUInt16LE(file.version, ptr+6);       // version needed to extract 
-    buf.writeUInt16LE(file.bitflag, ptr+8);       // general purpose bit flag   
+    buf.writeUInt32LE(0x02014b50, ptr+0);         // central file header signature
+    buf.writeUInt16LE(file.version, ptr+4);       // TODO version made by
+    buf.writeUInt16LE(file.version, ptr+6);       // version needed to extract
+    buf.writeUInt16LE(file.bitflag, ptr+8);       // general purpose bit flag
     buf.writeUInt16LE(file.method, ptr+10);       // compression method
     buf.writeUInt32LE(file.moddate, ptr+12);      // last mod file time and date
-    buf.writeInt32LE(file.crc32, ptr+16);         // crc-32 
-    buf.writeUInt32LE(file.compressed, ptr+20);   // compressed size  
-    buf.writeUInt32LE(file.uncompressed, ptr+24); // uncompressed size  
+    buf.writeInt32LE(file.crc32, ptr+16);         // crc-32
+    buf.writeUInt32LE(file.compressed, ptr+20);   // compressed size
+    buf.writeUInt32LE(file.uncompressed, ptr+24); // uncompressed size
     buf.writeUInt16LE(file.name.length, ptr+28);  // file name length
     buf.writeUInt16LE(0, ptr+30);                 // extra field length
     buf.writeUInt16LE(0, ptr+32);                 // file comment length
@@ -225,7 +225,7 @@ ZipStream.prototype._pushCentralDirectory = function() {
   }
 
   cdsize = ptr;
-  
+
   // end of central directory record
   buf.writeUInt32LE(0x06054b50, ptr+0);           // end of central dir signature
   buf.writeUInt16LE(0, ptr+4);                    // number of this disk
@@ -239,5 +239,5 @@ ZipStream.prototype._pushCentralDirectory = function() {
   ptr = ptr + 22;
 
   self.queue.push(buf.slice(0, ptr));
-	self.fileptr += ptr;
+  self.fileptr += ptr;
 }
