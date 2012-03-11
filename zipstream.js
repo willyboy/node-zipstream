@@ -175,29 +175,30 @@ ZipStream.prototype._pushLocalFileHeader = function(file) {
   var self = this;
 
   file.version = 20;
-  file.bitflag = 8;
+  file.bitflag = (1<<3) | (1<<11);
   file.method = file.store ? 0 : 8;
   file.moddate = convertDate(new Date());
   file.offset = self.fileptr;
 
-  var buf = new Buffer(30+file.name.length);
+  var buf = new Buffer(1024);
+  var len;
 
   buf.writeUInt32LE(0x04034b50, 0);         // local file header signature
   buf.writeUInt16LE(file.version, 4);       // version needed to extract
   buf.writeUInt16LE(file.bitflag, 6);       // general purpose bit flag
   buf.writeUInt16LE(file.method, 8);        // compression method
   buf.writeUInt32LE(file.moddate, 10);      // last mod file date and time
-
   buf.writeInt32LE(0, 14);                  // crc32
   buf.writeUInt32LE(0, 18);                 // compressed size
   buf.writeUInt32LE(0, 22);                 // uncompressed size
 
-  buf.writeUInt16LE(file.name.length, 26);  // file name length
   buf.writeUInt16LE(0, 28);                 // extra field length
-  buf.write(file.name, 30);                 // file name
+  len = buf.write(file.name, 30);           // file name
+  buf.writeUInt16LE(len, 26);               // file name length
 
-  self.queue.push(buf);
-  self.fileptr += buf.length;
+  len += 30; 
+  self.queue.push(buf.slice(0, len));
+  self.fileptr += len;
 }
 
 ZipStream.prototype._pushDataDescriptor = function(file) {
@@ -225,8 +226,7 @@ ZipStream.prototype._pushCentralDirectory = function() {
   for (var i=0; i<self.files.length; i++) {
     var file = self.files[i];
 
-    len = 46 + file.name.length;
-    buf = new Buffer(len);
+    buf = new Buffer(1024);
 
     // central directory file header
     buf.writeUInt32LE(0x02014b50, 0);         // central file header signature
@@ -238,17 +238,19 @@ ZipStream.prototype._pushCentralDirectory = function() {
     buf.writeInt32LE(file.crc32, 16);         // crc-32
     buf.writeUInt32LE(file.compressed, 20);   // compressed size
     buf.writeUInt32LE(file.uncompressed, 24); // uncompressed size
-    buf.writeUInt16LE(file.name.length, 28);  // file name length
+
     buf.writeUInt16LE(0, 30);                 // extra field length
     buf.writeUInt16LE(0, 32);                 // file comment length
     buf.writeUInt16LE(0, 34);                 // disk number where file starts
     buf.writeUInt16LE(0, 36);                 // internal file attributes
     buf.writeUInt32LE(0, 38);                 // external file attributes
     buf.writeUInt32LE(file.offset, 42);       // relative offset
-    buf.write(file.name, 46);                 // file name
+    len = buf.write(file.name, 46);           // file name
+    buf.writeUInt16LE(len, 28);               // file name length
 
+    len += 46;
     ptr = ptr + len;
-    self.queue.push(buf);
+    self.queue.push(buf.slice(0, len));
   }
 
   cdsize = ptr;
