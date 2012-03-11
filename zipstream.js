@@ -217,49 +217,57 @@ ZipStream.prototype._pushCentralDirectory = function() {
   var self = this;
   var cdoffset = self.fileptr;
 
-  var buf = new Buffer(1024);
   var ptr = 0;
   var cdsize = 0;
+
+  var len, buf;
 
   for (var i=0; i<self.files.length; i++) {
     var file = self.files[i];
 
-    // central directory file header
-    buf.writeUInt32LE(0x02014b50, ptr+0);         // central file header signature
-    buf.writeUInt16LE(file.version, ptr+4);       // TODO version made by
-    buf.writeUInt16LE(file.version, ptr+6);       // version needed to extract
-    buf.writeUInt16LE(file.bitflag, ptr+8);       // general purpose bit flag
-    buf.writeUInt16LE(file.method, ptr+10);       // compression method
-    buf.writeUInt32LE(file.moddate, ptr+12);      // last mod file time and date
-    buf.writeInt32LE(file.crc32, ptr+16);         // crc-32
-    buf.writeUInt32LE(file.compressed, ptr+20);   // compressed size
-    buf.writeUInt32LE(file.uncompressed, ptr+24); // uncompressed size
-    buf.writeUInt16LE(file.name.length, ptr+28);  // file name length
-    buf.writeUInt16LE(0, ptr+30);                 // extra field length
-    buf.writeUInt16LE(0, ptr+32);                 // file comment length
-    buf.writeUInt16LE(0, ptr+34);                 // disk number where file starts
-    buf.writeUInt16LE(0, ptr+36);                 // internal file attributes
-    buf.writeUInt32LE(0, ptr+38);                 // external file attributes
-    buf.writeUInt32LE(file.offset, ptr+42);       // relative offset
-    buf.write(file.name, ptr+46);                 // file name
+    len = 46 + file.name.length;
+    buf = new Buffer(len);
 
-    ptr = ptr + 46 + file.name.length;
+    // central directory file header
+    buf.writeUInt32LE(0x02014b50, 0);         // central file header signature
+    buf.writeUInt16LE(file.version, 4);       // TODO version made by
+    buf.writeUInt16LE(file.version, 6);       // version needed to extract
+    buf.writeUInt16LE(file.bitflag, 8);       // general purpose bit flag
+    buf.writeUInt16LE(file.method, 10);       // compression method
+    buf.writeUInt32LE(file.moddate, 12);      // last mod file time and date
+    buf.writeInt32LE(file.crc32, 16);         // crc-32
+    buf.writeUInt32LE(file.compressed, 20);   // compressed size
+    buf.writeUInt32LE(file.uncompressed, 24); // uncompressed size
+    buf.writeUInt16LE(file.name.length, 28);  // file name length
+    buf.writeUInt16LE(0, 30);                 // extra field length
+    buf.writeUInt16LE(0, 32);                 // file comment length
+    buf.writeUInt16LE(0, 34);                 // disk number where file starts
+    buf.writeUInt16LE(0, 36);                 // internal file attributes
+    buf.writeUInt32LE(0, 38);                 // external file attributes
+    buf.writeUInt32LE(file.offset, 42);       // relative offset
+    buf.write(file.name, 46);                 // file name
+
+    ptr = ptr + len;
+    self.queue.push(buf);
   }
 
   cdsize = ptr;
 
   // end of central directory record
-  buf.writeUInt32LE(0x06054b50, ptr+0);           // end of central dir signature
-  buf.writeUInt16LE(0, ptr+4);                    // number of this disk
-  buf.writeUInt16LE(0, ptr+6);                    // disk where central directory starts
-  buf.writeUInt16LE(self.files.length, ptr+8);    // number of central directory records on this disk
-  buf.writeUInt16LE(self.files.length, ptr+10);   // total number of central directory records
-  buf.writeUInt32LE(cdsize, ptr+12);              // size of central directory in bytes
-  buf.writeUInt32LE(cdoffset, ptr+16);            // offset of start of central directory, relative to start of archive
-  buf.writeUInt16LE(0, ptr+20);                   // comment length
+  len = 22;
+  buf = new Buffer(len);
 
-  ptr = ptr + 22;
+  buf.writeUInt32LE(0x06054b50, 0);           // end of central dir signature
+  buf.writeUInt16LE(0, 4);                    // number of this disk
+  buf.writeUInt16LE(0, 6);                    // disk where central directory starts
+  buf.writeUInt16LE(self.files.length, 8);    // number of central directory records on this disk
+  buf.writeUInt16LE(self.files.length, 10);   // total number of central directory records
+  buf.writeUInt32LE(cdsize, 12);              // size of central directory in bytes
+  buf.writeUInt32LE(cdoffset, 16);            // offset of start of central directory, relative to start of archive
+  buf.writeUInt16LE(0, 20);                   // comment length
 
-  self.queue.push(buf.slice(0, ptr));
+  ptr = ptr + len;
+
+  self.queue.push(buf);
   self.fileptr += ptr;
 }
