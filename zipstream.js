@@ -41,28 +41,28 @@ function convertDate(d) {
 }
 
 ZipStream.prototype.pause = function() {
-  console.log('zipstream::PAUSE');
+  // console.log('zipstream::PAUSE');
   var self = this;
   self.paused = true;
   self.deflate.pause();
 }
 
 ZipStream.prototype.resume = function() {
-  console.log('zipstream::RESUME');
+  // console.log('zipstream::RESUME');
   var self = this;
   self.paused = false;
   self.deflate.resume();
 }
 
 ZipStream.prototype.destroy = function() {
-  console.log('zipstream::DESTROY');
+  // console.log('zipstream::DESTROY');
   var self = this;
   self.readable = false;
   self.source.destroy();
 }
 
 ZipStream.prototype.destroySoon = function() {
-  console.log('zipstream::DESTROY');
+  // console.log('zipstream::DESTROYSOON');
   var self = this;
   self.readable = false;
   if (self.source.destroySoon){
@@ -72,8 +72,8 @@ ZipStream.prototype.destroySoon = function() {
   }
 }
 
-
 ZipStream.prototype.end = function() {
+  // console.log('zipstream::END');
   var self = this;
 
   if (self.files.length === 0) {
@@ -113,6 +113,7 @@ ZipStream.prototype.addFile = function(source, file, callback) {
   var compressed = 0;
 
   var deflateOnData = function(chunk) {
+    // console.log('deflate::DATA');
     compressed += chunk.length;
     self.emit('data', chunk);
   }
@@ -120,7 +121,7 @@ ZipStream.prototype.addFile = function(source, file, callback) {
   deflate.on('data', deflateOnData);
 
   var deflateOnEnd = function() {
-    console.log('deflate::END');
+    // console.log('deflate::END');
 
     file.crc32 = checksum.digest();
     file.compressed = compressed;
@@ -137,12 +138,13 @@ ZipStream.prototype.addFile = function(source, file, callback) {
   deflate.on('end', deflateOnEnd);
 
   var deflateOnDrain = function(){
+    // console.log('deflate::DRAIN');
     source.resume();
   }
   deflate.on('drain', deflateOnDrain);
 
   var deflateOnError = function(err){
-    console.log('defalate::ERROR');
+    // console.log('deflate::ERROR');
     source.destroy();
     self.readable = false;
     cleanup()
@@ -151,7 +153,7 @@ ZipStream.prototype.addFile = function(source, file, callback) {
   deflate.on('error', deflateOnError);
 
   var sourceOnData = function(data) {
-    console.log('source::DATA');
+    // console.log('source::DATA');
     uncompressed += data.length;
     checksum.update(data);
     if (deflate.writable && !deflate.write(data) && source.pause) {
@@ -161,19 +163,19 @@ ZipStream.prototype.addFile = function(source, file, callback) {
   source.on('data', sourceOnData);
 
   var sourceOnEnd = function() {
-    console.log('source::END');
+    // console.log('source::END');
     deflate.end();
   }
   source.on('end', sourceOnEnd);
 
   var sourceOnClose = function(){
-    console.log('source::CLOSE');
+    // console.log('source::CLOSE');
     deflate.end();
   }
   source.on('close', sourceOnClose);
 
   sourceOnError = function(err){
-    console.log('source::ERROR');
+    // console.log('source::ERROR');
     deflate.end();
     self.readable = false;
     cleanup()
