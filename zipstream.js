@@ -104,48 +104,58 @@ ZipStream.prototype.addFile = function(source, file, callback) {
     return;
   }
 
+  if (typeof source === 'string') {
+    source = new Buffer(source, 'utf-8');
+  }
+
   self.busy = true;
   self.file = file;
 
   self._pushLocalFileHeader(file);
 
   var checksum = crc32.createCRC32();
-  var uncompressed = 0;
+  file.uncompressed = 0;
 
   if (file.store) {
-    var size = 0;
-    source.on('data', function(chunk) {
-      checksum.update(chunk);
-      uncompressed += chunk.length;
-      self.queue.push(chunk);
-    });
-
-    source.on('end', function() {
+    function onEnd() {
       file.crc32 = checksum.digest();
-      file.compressed = file.uncompressed = uncompressed;
+      file.compressed = file.uncompressed;
 
-      self.fileptr += uncompressed;
+      self.fileptr += file.uncompressed;
       self._pushDataDescriptor(file);
 
       self.files.push(file);
       self.busy = false;
       callback();
-    });
+    }
+    if (Buffer.isBuffer(source)) {
+      checksum.update(source);
+      file.uncompressed = source.length;
+      self.queue.push(source);
+      process.nextTick(onEnd);
+    } else {
+      // Assume stream
+      source.on('data', function(chunk) {
+        checksum.update(chunk);
+        file.uncompressed += chunk.length;
+        self.queue.push(chunk);
+      });
+
+      source.on('end', onEnd);
+    }
   } else {
     var deflate = zlib.createDeflateRaw(self.options);
-    var compressed = 0;
+    file.compressed = 0;
 
     deflate.on('data', function(chunk) {
-      compressed += chunk.length;
+      file.compressed += chunk.length;
       self.queue.push(chunk);
     });
 
     deflate.on('end', function() {
       file.crc32 = checksum.digest();
-      file.compressed = compressed;
-      file.uncompressed = uncompressed;
 
-      self.fileptr += compressed;
+      self.fileptr += file.compressed;
       self._pushDataDescriptor(file);
 
       self.files.push(file);
@@ -153,15 +163,23 @@ ZipStream.prototype.addFile = function(source, file, callback) {
       callback();
     });
 
-    source.on('data', function(chunk) {
-      uncompressed += chunk.length;
-      checksum.update(chunk);
-      deflate.write(chunk); //TODO check for false & wait for drain
-    });
-
-    source.on('end', function() {
+    if (Buffer.isBuffer(source)) {
+      file.uncompressed = source.length;
+      checksum.update(source);
+      deflate.write(source);
       deflate.end();
-    });
+    } else {
+      // Assume stream
+      source.on('data', function(chunk) {
+        file.uncompressed += chunk.length;
+        checksum.update(chunk);
+        deflate.write(chunk); //TODO check for false & wait for drain
+      });
+
+      source.on('end', function() {
+        deflate.end();
+      });
+    }
   }
 
   process.nextTick(function() { self._read(); });
