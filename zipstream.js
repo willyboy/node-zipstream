@@ -195,7 +195,8 @@ ZipStream.prototype._pushLocalFileHeader = function(file) {
   file.version = 20;
   file.bitflag = (1<<3) | (1<<11);
   file.method = file.store ? 0 : 8;
-  file.moddate = convertDate(new Date());
+  if (!file.date) { file.date = new Date(); }
+  file.moddate = convertDate(file.date);
   file.offset = self.fileptr;
 
   var buf = new Buffer(1024);
